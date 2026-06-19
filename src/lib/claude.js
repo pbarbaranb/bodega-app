@@ -1,39 +1,39 @@
 export async function callClaude(prompt, imageB64 = null, imageMime = 'image/jpeg') {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_KEY;
-  if (!apiKey) throw new Error('Falta VITE_ANTHROPIC_KEY');
+  const apiKey = import.meta.env.VITE_GEMINI_KEY;
+  if (!apiKey) throw new Error('Falta VITE_GEMINI_KEY');
 
-  const content = imageB64
-    ? [
-        {
-          type: 'image',
-          source: { type: 'base64', media_type: imageMime, data: imageB64 },
+  const parts = [];
+
+  if (imageB64) {
+    parts.push({
+      inline_data: { mime_type: imageMime, data: imageB64 },
+    });
+  }
+
+  parts.push({ text: prompt });
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1000,
         },
-        { type: 'text', text: prompt },
-      ]
-    : [{ type: 'text', text: prompt }];
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content }],
-    }),
-  });
+      }),
+    }
+  );
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(err || 'Error llamando a Claude');
+    throw new Error(err || 'Error llamando a Gemini');
   }
 
   const data = await res.json();
-  return data.content?.find((b) => b.type === 'text')?.text || '';
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
 export function parseClaudeJson(raw) {
