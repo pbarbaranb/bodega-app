@@ -156,7 +156,7 @@ export default function Productos() {
             </div>
           )}
         </button>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onImg} />
+        <input ref={fileRef} type="file" accept="image/*"  className="hidden" onChange={onImg} />
 
         <Input label="Nombre del producto" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Inca Kola 500ml" />
         <Select label="Categoría" value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}>

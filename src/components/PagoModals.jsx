@@ -137,7 +137,7 @@ Responde ÚNICAMENTE con JSON válido sin backticks:
               </div>
             )}
           </button>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto} />
+          <input ref={fileRef} type="file" accept="image/*"  className="hidden" onChange={onPhoto} />
           <Btn disabled={!photo} onClick={extract}>🤖 Leer voucher con IA</Btn>
           <Btn variant="ghost" onClick={handleClose}>Cancelar</Btn>
         </>

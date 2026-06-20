@@ -255,7 +255,7 @@ Responde SOLO JSON sin backticks:
                 </>
               )}
             </button>
-            <input ref={ticketRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onTicketPhoto} />
+            <input ref={ticketRef} type="file" accept="image/*"  className="hidden" onChange={onTicketPhoto} />
             <Btn disabled={!scanPhoto} onClick={scanTicket}>🤖 Extraer productos con IA</Btn>
             <Btn variant="ghost" onClick={() => setScanOpen(false)}>Cancelar</Btn>
           </>
