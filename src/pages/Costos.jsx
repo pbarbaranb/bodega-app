@@ -104,8 +104,7 @@ export default function Costos() {
     setScanPhoto(data);
   };
 
-  
-const scanTicket = async () => {
+  const scanTicket = async () => {
     if (!scanPhoto) return;
     setScanStep(2);
     setScanning(true);
@@ -116,7 +115,6 @@ Responde SOLO JSON sin backticks:
 
     try {
       const raw = await callClaude(prompt, scanPhoto.base64, scanPhoto.mime);
-      console.log('RESPUESTA CRUDA DE GEMINI:', raw);
       const data = parseClaudeJson(raw);
       setExtracted({
         proveedor: data.proveedor || '',
@@ -128,9 +126,8 @@ Responde SOLO JSON sin backticks:
         })),
       });
       setScanStep(3);
-    } catch (err) {
-      console.error('ERROR COMPLETO:', err);
-      showToast(err.message || 'No se pudo leer el ticket', 'error');
+    } catch {
+      showToast('No se pudo leer el ticket', 'error');
       setScanStep(1);
     } finally {
       setScanning(false);

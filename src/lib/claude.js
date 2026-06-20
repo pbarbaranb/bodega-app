@@ -21,7 +21,8 @@ export async function callClaude(prompt, imageB64 = null, imageMime = 'image/jpe
         contents: [{ parts }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 1000,
+          maxOutputTokens: 4096,
+          responseMimeType: 'application/json',
         },
       }),
     }
