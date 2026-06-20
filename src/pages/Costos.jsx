@@ -9,6 +9,7 @@ export default function Costos() {
   const { showToast } = useToast();
   const [costos, setCostos] = useState([]);
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [stats, setStats] = useState({ ganancia: 0, margen: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -20,6 +21,7 @@ export default function Costos() {
   const [scanStep, setScanStep] = useState(1);
   const [scanPhoto, setScanPhoto] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [extracted, setExtracted] = useState({ proveedor: '', items: [] });
   const ticketRef = useRef(null);
 
@@ -27,20 +29,16 @@ export default function Costos() {
     setLoading(true);
     const today = new Date().toISOString().split('T')[0];
 
-    const [{ data: costData }, { data: prods }, { data: ventas }] = await Promise.all([
-      supabase
-        .from('costos')
-        .select('*, productos(nombre, precio)')
-        .order('created_at', { ascending: false }),
+    const [{ data: costData }, { data: prods }, { data: cats }, { data: ventas }] = await Promise.all([
+      supabase.from('costos').select('*, productos(nombre, precio)').order('created_at', { ascending: false }),
       supabase.from('productos').select('id, nombre, precio').eq('activo', true).order('nombre'),
-      supabase
-        .from('ventas')
-        .select('total, created_at, venta_items(producto_id, cantidad, precio_unitario)')
-        .gte('created_at', `${today}T00:00:00`),
+      supabase.from('categorias').select('*').order('nombre'),
+      supabase.from('ventas').select('total, created_at, venta_items(producto_id, cantidad, precio_unitario)').gte('created_at', `${today}T00:00:00`),
     ]);
 
     setCostos(costData || []);
     setProducts(prods || []);
+    setCategories(cats || []);
 
     const margins = (costData || []).map((c) => {
       const precio = c.productos?.precio || 0;
@@ -116,44 +114,89 @@ Responde SOLO JSON sin backticks:
     try {
       const raw = await callClaude(prompt, scanPhoto.base64, scanPhoto.mime);
       const data = parseClaudeJson(raw);
+      const defaultCatId = categories[0]?.id || '';
       setExtracted({
         proveedor: data.proveedor || '',
-        items: (data.items || []).map((i) => ({
-          nombre: i.nombre || '',
-          costo_total: i.costo_total || 0,
-          unidades: i.unidades || 1,
-          producto_id: '',
-        })),
+        items: (data.items || []).map((i) => {
+          const ct = i.costo_total || 0;
+          const u = i.unidades || 1;
+          const costoUd = ct / u;
+          const precioSugerido = Math.ceil((costoUd * 1.4) * 10) / 10; // +40% redondeado a 0.10
+          return {
+            nombre: i.nombre || '',
+            costo_total: ct,
+            unidades: u,
+            categoria_id: defaultCatId,
+            precio_venta: precioSugerido.toFixed(2),
+          };
+        }),
       });
       setScanStep(3);
-    } catch {
-      showToast('No se pudo leer el ticket', 'error');
+    } catch (err) {
+      showToast(err.message || 'No se pudo leer el ticket', 'error');
       setScanStep(1);
     } finally {
       setScanning(false);
     }
   };
 
+  const updateItem = (idx, field, value) => {
+    const items = [...extracted.items];
+    items[idx] = { ...items[idx], [field]: value };
+    setExtracted({ ...extracted, items });
+  };
+
   const saveExtracted = async () => {
-    const valid = extracted.items.filter((i) => i.producto_id && i.costo_total);
+    const valid = extracted.items.filter((i) => i.nombre.trim() && i.costo_total > 0 && i.categoria_id);
     if (!valid.length) {
-      showToast('Asigna al menos un producto', 'error');
+      showToast('Completa nombre, categoría y costo de al menos un producto', 'error');
       return;
     }
-    for (const item of valid) {
-      await supabase.from('costos').insert({
-        producto_id: parseInt(item.producto_id),
-        proveedor: extracted.proveedor.trim(),
-        costo_total: parseFloat(item.costo_total),
-        unidades: parseInt(item.unidades) || 1,
-        costo_unitario: parseFloat(item.costo_total) / (parseInt(item.unidades) || 1),
-      });
+    setSaving(true);
+    try {
+      let created = 0;
+      for (const item of valid) {
+        const unidades = parseInt(item.unidades) || 1;
+        const costoTotal = parseFloat(item.costo_total);
+        const costoUd = costoTotal / unidades;
+
+        // 1. Crear el producto nuevo
+        const { data: nuevoProducto, error: prodErr } = await supabase
+          .from('productos')
+          .insert({
+            nombre: item.nombre.trim(),
+            categoria_id: parseInt(item.categoria_id),
+            precio: parseFloat(item.precio_venta) || costoUd * 1.4,
+            stock: unidades,
+            activo: true,
+          })
+          .select()
+          .single();
+
+        if (prodErr) continue;
+
+        // 2. Registrar el costo vinculado a ese producto y al proveedor
+        await supabase.from('costos').insert({
+          producto_id: nuevoProducto.id,
+          proveedor: extracted.proveedor.trim(),
+          costo_total: costoTotal,
+          unidades,
+          costo_unitario: costoUd,
+        });
+
+        created++;
+      }
+      showToast(`${created} productos agregados con su costo`, 'success');
+      setScanOpen(false);
+      setScanStep(1);
+      setScanPhoto(null);
+      setExtracted({ proveedor: '', items: [] });
+      load();
+    } catch {
+      showToast('Error guardando productos', 'error');
+    } finally {
+      setSaving(false);
     }
-    showToast(`${valid.length} costos guardados`, 'success');
-    setScanOpen(false);
-    setScanStep(1);
-    setScanPhoto(null);
-    load();
   };
 
   const marginColor = (m) => (m >= 30 ? 'text-bodega' : m >= 15 ? 'text-yellow' : 'text-red');
@@ -207,7 +250,7 @@ Responde SOLO JSON sin backticks:
                 <div>
                   <div className="text-sm font-extrabold">{c.productos?.nombre}</div>
                   <div className="text-[11px] font-bold text-muted">
-                    Costo/ud {formatMoney(costoUd)} · Venta {formatMoney(precio)}
+                    {c.proveedor && `${c.proveedor} · `}Costo/ud {formatMoney(costoUd)} · Venta {formatMoney(precio)}
                   </div>
                 </div>
                 <div className={`font-mono text-sm font-bold ${marginColor(margen)}`}>
@@ -255,7 +298,7 @@ Responde SOLO JSON sin backticks:
                 </>
               )}
             </button>
-            <input ref={ticketRef} type="file" accept="image/*"  className="hidden" onChange={onTicketPhoto} />
+            <input ref={ticketRef} type="file" accept="image/*" className="hidden" onChange={onTicketPhoto} />
             <Btn disabled={!scanPhoto} onClick={scanTicket}>🤖 Extraer productos con IA</Btn>
             <Btn variant="ghost" onClick={() => setScanOpen(false)}>Cancelar</Btn>
           </>
@@ -264,71 +307,71 @@ Responde SOLO JSON sin backticks:
         {scanStep === 2 && scanning && (
           <div className="py-10 text-center">
             <Spinner className="mx-auto" size="lg" />
-            <p className="mt-3 font-bold text-muted">Claude está leyendo el ticket...</p>
+            <p className="mt-3 font-bold text-muted">Gemini está leyendo el ticket...</p>
           </div>
         )}
 
         {scanStep === 3 && (
           <>
+            <p className="mb-2 text-xs font-bold text-muted">
+              Se van a crear {extracted.items.length} productos nuevos. Verifica y corrige antes de guardar.
+            </p>
             <Input label="Proveedor" value={extracted.proveedor} onChange={(e) => setExtracted({ ...extracted, proveedor: e.target.value })} />
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-muted">
-                    <th className="pb-2">Producto ticket</th>
-                    <th className="pb-2">Asignar a</th>
-                    <th className="pb-2">Costo</th>
-                    <th className="pb-2">Uds</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {extracted.items.map((item, idx) => (
-                    <tr key={idx} className="border-t border-black/5">
-                      <td className="py-2 pr-1 font-bold">{item.nombre}</td>
-                      <td className="py-2 pr-1">
-                        <select
-                          className="w-full rounded-lg bg-white p-1 text-[10px] font-bold"
-                          value={item.producto_id}
-                          onChange={(e) => {
-                            const items = [...extracted.items];
-                            items[idx] = { ...items[idx], producto_id: e.target.value };
-                            setExtracted({ ...extracted, items });
-                          }}
-                        >
-                          <option value="">—</option>
-                          {products.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                        </select>
-                      </td>
-                      <td className="py-2 pr-1">
-                        <input
-                          type="number"
-                          className="w-16 rounded-lg bg-white p-1 font-mono text-[10px]"
-                          value={item.costo_total}
-                          onChange={(e) => {
-                            const items = [...extracted.items];
-                            items[idx] = { ...items[idx], costo_total: e.target.value };
-                            setExtracted({ ...extracted, items });
-                          }}
-                        />
-                      </td>
-                      <td className="py-2">
-                        <input
-                          type="number"
-                          className="w-12 rounded-lg bg-white p-1 font-mono text-[10px]"
-                          value={item.unidades}
-                          onChange={(e) => {
-                            const items = [...extracted.items];
-                            items[idx] = { ...items[idx], unidades: e.target.value };
-                            setExtracted({ ...extracted, items });
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            <div className="max-h-96 space-y-3 overflow-y-auto">
+              {extracted.items.map((item, idx) => (
+                <div key={idx} className="rounded-xl bg-cream p-3">
+                  <input
+                    className="mb-2 w-full rounded-lg bg-white p-2 text-sm font-extrabold"
+                    value={item.nombre}
+                    onChange={(e) => updateItem(idx, 'nombre', e.target.value)}
+                    placeholder="Nombre del producto"
+                  />
+                  <select
+                    className="mb-2 w-full rounded-lg bg-white p-2 text-xs font-bold"
+                    value={item.categoria_id}
+                    onChange={(e) => updateItem(idx, 'categoria_id', e.target.value)}
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.emoji} {c.nombre}</option>
+                    ))}
+                  </select>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[9px] font-bold text-muted">Costo total</label>
+                      <input
+                        type="number"
+                        className="w-full rounded-lg bg-white p-1.5 font-mono text-xs"
+                        value={item.costo_total}
+                        onChange={(e) => updateItem(idx, 'costo_total', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-muted">Unidades</label>
+                      <input
+                        type="number"
+                        className="w-full rounded-lg bg-white p-1.5 font-mono text-xs"
+                        value={item.unidades}
+                        onChange={(e) => updateItem(idx, 'unidades', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-bodega">Precio venta</label>
+                      <input
+                        type="number"
+                        className="w-full rounded-lg bg-white p-1.5 font-mono text-xs font-bold text-bodega"
+                        value={item.precio_venta}
+                        onChange={(e) => updateItem(idx, 'precio_venta', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <Btn onClick={saveExtracted}>💾 Guardar todos los costos</Btn>
+
+            <Btn disabled={saving} onClick={saveExtracted}>
+              {saving ? 'Guardando...' : `💾 Crear ${extracted.items.length} productos`}
+            </Btn>
             <Btn variant="ghost" onClick={() => setScanStep(1)}>← Retomar foto</Btn>
           </>
         )}
