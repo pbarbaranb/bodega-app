@@ -105,6 +105,16 @@ export default function Productos() {
     return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
   }
 
+  const grouped = Object.entries(
+    products.reduce((acc, p) => {
+      const key = p.categorias?.nombre || 'Sin categoría';
+      const emoji = p.categorias?.emoji || '📦';
+      if (!acc[key]) acc[key] = { emoji, items: [] };
+      acc[key].items.push(p);
+      return acc;
+    }, {})
+  ).sort(([a], [b]) => a.localeCompare(b));
+
   return (
     <>
       <Btn onClick={openNew} className="mb-3 mt-0">+ Agregar producto</Btn>
@@ -116,26 +126,31 @@ export default function Productos() {
             <p className="text-sm font-bold text-muted">Sin productos</p>
           </div>
         ) : (
-          products.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 border-b border-black/5 py-3 last:border-0">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-cream text-2xl">
-                {p.imagen_url ? (
-                  <img src={p.imagen_url} alt={p.nombre} className="h-full w-full object-cover" />
-                ) : (
-                  p.categorias?.emoji || '📦'
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-extrabold">{p.nombre}</div>
-                <div className="text-[11px] font-bold text-muted">
-                  {p.categorias?.emoji} {p.categorias?.nombre} · Stock: {p.stock}
+          grouped.map(([catName, group]) => (
+            <div key={catName} className="mb-2">
+              <p className="mb-1 mt-3 text-xs font-extrabold uppercase text-muted first:mt-0">
+                {group.emoji} {catName}
+              </p>
+              {group.items.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 border-b border-black/5 py-3 last:border-0">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-cream text-2xl">
+                    {p.imagen_url ? (
+                      <img src={p.imagen_url} alt={p.nombre} className="h-full w-full object-cover" />
+                    ) : (
+                      p.categorias?.emoji || '📦'
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-extrabold">{p.nombre}</div>
+                    <div className="text-[11px] font-bold text-muted">Stock: {p.stock}</div>
+                    <div className="font-mono text-sm font-bold text-bodega">{formatMoney(p.precio)}</div>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => openEdit(p)} className="rounded-lg bg-cream px-2 py-1 text-sm">✏️</button>
+                    <button onClick={() => remove(p.id)} className="rounded-lg bg-red/10 px-2 py-1 text-sm">🗑️</button>
+                  </div>
                 </div>
-                <div className="font-mono text-sm font-bold text-bodega">{formatMoney(p.precio)}</div>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={() => openEdit(p)} className="rounded-lg bg-cream px-2 py-1 text-sm">✏️</button>
-                <button onClick={() => remove(p.id)} className="rounded-lg bg-red/10 px-2 py-1 text-sm">🗑️</button>
-              </div>
+              ))}
             </div>
           ))
         )}
@@ -156,7 +171,7 @@ export default function Productos() {
             </div>
           )}
         </button>
-        <input ref={fileRef} type="file" accept="image/*"  className="hidden" onChange={onImg} />
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onImg} />
 
         <Input label="Nombre del producto" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Inca Kola 500ml" />
         <Select label="Categoría" value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}>

@@ -5,6 +5,7 @@ const ProductsContext = createContext(null);
 
 export function ProductsProvider({ children }) {
   const [products, setProducts] = useState([]);
+  const [topSellerIds, setTopSellerIds] = useState([]);
   const [cart, setCart] = useState({});
   const [selectedPay, setSelectedPay] = useState('plin');
   const [loading, setLoading] = useState(false);
@@ -13,13 +14,25 @@ export function ProductsProvider({ children }) {
     setLoading(true);
     const { data, error } = await supabase
       .from('productos')
-      .select('*, categorias(nombre, emoji)')
+      .select('*, categorias(id, nombre, emoji)')
       .eq('activo', true)
       .order('nombre');
 
     if (!error) setProducts(data || []);
     setLoading(false);
     return data || [];
+  }, []);
+
+  const loadTopSellers = useCallback(async (limit = 8) => {
+    const { data } = await supabase.from('venta_items').select('producto_id, cantidad');
+    if (!data) { setTopSellerIds([]); return; }
+    const totals = {};
+    data.forEach((i) => { totals[i.producto_id] = (totals[i.producto_id] || 0) + i.cantidad; });
+    const sorted = Object.entries(totals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([id]) => Number(id));
+    setTopSellerIds(sorted);
   }, []);
 
   const addToCart = (id) => {
@@ -104,6 +117,7 @@ export function ProductsProvider({ children }) {
     <ProductsContext.Provider
       value={{
         products,
+        topSellerIds,
         cart,
         cartItems,
         cartTotal,
@@ -111,6 +125,7 @@ export function ProductsProvider({ children }) {
         loading,
         setSelectedPay,
         loadProducts,
+        loadTopSellers,
         addToCart,
         changeQty,
         clearCart,
