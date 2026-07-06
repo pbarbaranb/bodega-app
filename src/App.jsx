@@ -3,14 +3,14 @@ import { AuthProvider } from './hooks/useAuth';
 import { ProductsProvider } from './hooks/useProducts';
 import { ToastProvider } from './components/ui/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
-import AdminGate from './components/AdminGate';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Venta from './pages/Venta';
-import Resumen from './pages/Resumen';
 import Historial from './pages/Historial';
 import Productos from './pages/Productos';
-import Costos from './pages/Costos';
+import Compras from './pages/Compras';
+import Finanzas from './pages/Finanzas';
+import Fiados from './pages/Fiados';
 
 export default function App() {
   return (
@@ -23,11 +23,12 @@ export default function App() {
               <Route element={<ProtectedRoute />}>
                 <Route element={<Layout />}>
                   <Route index element={<Navigate to="/venta" replace />} />
-                  <Route path="venta" element={<Venta />} />
-                  <Route path="resumen" element={<Resumen />} />
+                  <Route path="venta"    element={<Venta />} />
                   <Route path="historial" element={<Historial />} />
-                  <Route path="productos" element={<AdminGate><Productos /></AdminGate>} />
-                  <Route path="costos" element={<AdminGate><Costos /></AdminGate>} />
+                  <Route path="productos" element={<Productos />} />
+                  <Route path="fiados"   element={<Fiados />} />
+                  <Route path="compras"  element={<Compras />} />
+                  <Route path="finanzas" element={<Finanzas />} />
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/venta" replace />} />
