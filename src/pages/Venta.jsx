@@ -91,48 +91,23 @@ export default function Venta() {
         ))
       )}
 
-      {/* Carrito */}
+      {/* Espacio para que el carrito sticky no tape productos */}
+      {cartItems.length > 0 && <div className="h-48" />}
+
+      {/* Carrito sticky en la parte inferior */}
       {cartItems.length > 0 && (
-        <Card title="Carrito" className="mt-4">
-          <div className="space-y-3">
-            {cartItems.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-extrabold">{p.nombre}</div>
-                  <div className="text-xs font-bold text-muted">{formatMoney(p.precio)} c/u</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => changeQty(p.id, -1)} className="flex h-9 w-9 items-center justify-center rounded-lg bg-cream text-lg font-bold">−</button>
-                  <span className="w-6 text-center font-extrabold">{p.qty}</span>
-                  <button onClick={() => changeQty(p.id, 1)} className="flex h-9 w-9 items-center justify-center rounded-lg bg-cream text-lg font-bold">+</button>
-                  <span className="font-mono text-sm font-bold text-bodega w-16 text-right">{formatMoney(p.precio * p.qty)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-4">
-            <span className="text-sm font-extrabold">Total</span>
-            <span className="font-mono text-2xl font-bold text-bodega">{formatMoney(cartTotal)}</span>
-          </div>
-
-          <p className="mt-4 text-xs font-extrabold uppercase text-muted">Método de pago</p>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {[
-              { val: 'plin',  label: '💚 Yape/Plin', active: 'bg-bodega text-white' },
-              { val: 'cash',  label: '💵 Efectivo',   active: 'bg-bodega text-white' },
-              { val: 'fiado', label: '📒 Fiado',      active: 'bg-red text-white' },
-            ].map(({ val, label, active }) => (
-              <button key={val} onClick={() => setSelectedPay(val)}
-                className={`rounded-xl py-3 text-xs font-extrabold ${selectedPay === val ? active : 'bg-cream text-ink'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <Btn onClick={finalize}>✅ Cobrar</Btn>
-          <Btn variant="ghost" onClick={clearCart}>🗑️ Limpiar carrito</Btn>
-        </Card>
+        <div className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-[480px]">
+          {/* Barra colapsada — siempre visible */}
+          <CartBar
+            cartItems={cartItems}
+            cartTotal={cartTotal}
+            selectedPay={selectedPay}
+            setSelectedPay={setSelectedPay}
+            changeQty={changeQty}
+            clearCart={clearCart}
+            finalize={finalize}
+          />
+        </div>
       )}
 
       <PagoPlinModal   open={plinOpen}  onClose={() => setPlinOpen(false)}  total={cartTotal} onSuccess={onSuccess} />
