@@ -124,7 +124,7 @@ export default function Venta() {
 
       {/* ── CARRITO STICKY BOTTOM ── */}
       {cartItems.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-[480px]">
+        <div style={{position:'fixed', bottom:0, left:0, right:0, zIndex:50}}>
           <div className="bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.12)] rounded-t-3xl overflow-hidden">
 
             {/* Barra superior — siempre visible, toca para expandir/colapsar */}

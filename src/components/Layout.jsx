@@ -71,7 +71,7 @@ export default function Layout() {
         ))}
       </nav>
 
-      <main className="flex-1 overflow-y-auto p-4 pb-8">
+      <main className="flex-1 p-4 pb-8">
         <Outlet />
       </main>
     </div>
